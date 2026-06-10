@@ -5,15 +5,11 @@ from langchain.agents import create_agent
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph.state import CompiledStateGraph
 
-
-checkpointer = InMemorySaver()
-
-
 def build_graph() -> CompiledStateGraph:
     return create_agent(
         model="openai:gpt-4.1-mini",
         system_prompt="You are a cooking assistant that provides practical, safe, and concise cooking advice.",
-        checkpointer=checkpointer,
+        checkpointer=InMemorySaver(),
     )
 
 
