@@ -1,4 +1,4 @@
-# Langgraph AG-UI Example
+# LangGraph AG-UI Example
 
 A full-stack demo that connects a LangChain/LangGraph cooking assistant to a CopilotKit chat UI.
 
