@@ -1,10 +1,20 @@
+import asyncio
+import logging
+import os
+
 import uvicorn
 from fastapi import FastAPI
 from ag_ui_langgraph import LangGraphAgent, add_langgraph_fastapi_endpoint
 from langchain.agents import create_agent
+from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_core.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph.state import CompiledStateGraph
+
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_FOOD_RECIPE_MCP_URL = "https://recipes.aidatanorge.no/mcp"
 
 
 @tool
@@ -53,16 +63,48 @@ def convert_temperature(value: float, from_scale: str, to_scale: str) -> str:
 
 
 def build_graph() -> CompiledStateGraph:
+    mcp_tools = load_food_recipe_mcp_tools()
+
     return create_agent(
         model="openai:gpt-4.1-mini",
         system_prompt=(
             "You are a cooking assistant that provides practical, safe, and concise cooking advice. "
-            "You have access to a temperature conversion tool — use it whenever the user asks to "
-            "convert temperatures between Celsius and Fahrenheit."
+            "You have access to a temperature conversion tool and a recipe search MCP tool. "
+            "Use the temperature tool whenever the user asks to convert temperatures between Celsius "
+            "and Fahrenheit. Use recipe search for recipe discovery or filtering requests. "
+            "IMPORTANT: The recipe search tool requires all query parameters to be in English. "
+            "If the user's request is in another language, translate key terms (dishes, ingredients, cooking methods) "
+            "to English before calling the recipe search tool."
         ),
-        tools=[convert_temperature],
+        tools=[convert_temperature, *mcp_tools],
         checkpointer=InMemorySaver(),
     )
+
+
+def load_food_recipe_mcp_tools():
+    enabled = os.getenv("FOOD_RECIPE_MCP_ENABLED", "true").strip().lower()
+    if enabled in {"0", "false", "no", "off"}:
+        return []
+
+    mcp_url = os.getenv("FOOD_RECIPE_MCP_URL", DEFAULT_FOOD_RECIPE_MCP_URL).strip()
+    if not mcp_url:
+        logger.warning("FOOD_RECIPE_MCP_URL is empty, skipping MCP tool loading.")
+        return []
+
+    client = MultiServerMCPClient(
+        {
+            "food-recipe": {
+                "transport": "streamable_http",
+                "url": mcp_url,
+            }
+        }
+    )
+
+    try:
+        return asyncio.run(client.get_tools(server_name="food-recipe"))
+    except Exception as exc:  # pragma: no cover - network/runtime dependent
+        logger.warning("Unable to load Food Recipe MCP tools from %s: %s", mcp_url, exc)
+        return []
 
 
 app = FastAPI(title="LangGraph AG-UI Agent")
@@ -82,4 +124,4 @@ def health() -> dict[str, str]:
 
 
 def main() -> None:
-    uvicorn.run("agent.app:app", host="127.0.0.1", port=8000, reload=False)
+    uvicorn.run("cooking_agent.app:app", host="127.0.0.1", port=8300, reload=False)

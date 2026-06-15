@@ -5,7 +5,7 @@ import {
 } from "@copilotkit/runtime";
 import { LangGraphHttpAgent } from "@copilotkit/runtime/langgraph";
 
-const agentUrl = process.env.AGENT_URL || "http://localhost:8000/agent";
+const agentUrl = process.env.AGENT_URL || "http://localhost:8300/agent";
 
 const runtime = new CopilotRuntime({
   agents: {

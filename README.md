@@ -31,12 +31,12 @@ export OPENAI_API_KEY=your_key_here
 uv run agent
 ```
 
-The agent starts on `http://127.0.0.1:8000`.
+The agent starts on `http://127.0.0.1:8300`.
 
 Quick check:
 
 ```bash
-curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8300/health
 ```
 
 Expected response:
@@ -51,7 +51,7 @@ From the `web/` folder:
 
 ```bash
 npm install
-export AGENT_URL=http://127.0.0.1:8000/agent
+export AGENT_URL=http://127.0.0.1:8300/agent
 npm run dev
 ```
 
@@ -66,14 +66,14 @@ Open `http://localhost:3000`.
 ### Frontend (`web`)
 
 - `AGENT_URL` (optional)
-  - Default: `http://localhost:8000/agent`
+  - Default: `http://localhost:8300/agent`
   - Set this when your backend runs on a different host/port.
 
 ## Scripts
 
 ### `agent/`
 
-- `uv run agent` - start FastAPI server on `127.0.0.1:8000`
+- `uv run agent` - start FastAPI server on `127.0.0.1:8300`
 
 ### `web/`
 
@@ -102,4 +102,4 @@ Open `http://localhost:3000`.
 - If model calls fail:
   - Confirm `OPENAI_API_KEY` is set in the backend shell.
 - If port conflicts occur:
-  - Stop processes using `3000` or `8000`, or run services on different ports and update `AGENT_URL`.
+  - Stop processes using `3000` or `8300`, or run services on different ports and update `AGENT_URL`.
