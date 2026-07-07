@@ -1,6 +1,9 @@
-import { CopilotChat } from "@copilotkit/react-core/v2";
+"use client";
+
+import { CopilotChat, useDefaultRenderTool } from "@copilotkit/react-core/v2";
 
 export default function Home() {
+  useDefaultRenderTool();
   return (
     <main className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top,#f7efe4_0%,#efe4d1_32%,#dcc7aa_100%)] p-3 text-stone-900 sm:p-4 lg:p-5">
       <div className="mx-auto h-full max-w-7xl">

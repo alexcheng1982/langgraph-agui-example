@@ -28,7 +28,7 @@ From the `agent/` folder:
 ```bash
 uv sync
 export OPENAI_API_KEY=your_key_here
-uv run agent
+uv run cooking_agent
 ```
 
 The agent starts on `http://127.0.0.1:8300`.

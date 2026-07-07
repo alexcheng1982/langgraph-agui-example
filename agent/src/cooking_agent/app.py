@@ -3,6 +3,7 @@ import logging
 import os
 
 import uvicorn
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from ag_ui_langgraph import LangGraphAgent, add_langgraph_fastapi_endpoint
 from langchain.agents import create_agent
@@ -13,9 +14,14 @@ from langgraph.graph.state import CompiledStateGraph
 
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
+load_dotenv();
 
 DEFAULT_FOOD_RECIPE_MCP_URL = "https://recipes.aidatanorge.no/mcp"
+MODEL = os.getenv("MODEL", "openrouter:deepseek/deepseek-v4-flash")
 
+logger.info("Use model %s", MODEL)
 
 @tool
 def convert_temperature(value: float, from_scale: str, to_scale: str) -> str:
@@ -66,7 +72,7 @@ def build_graph() -> CompiledStateGraph:
     mcp_tools = load_food_recipe_mcp_tools()
 
     return create_agent(
-        model="openai:gpt-4.1-mini",
+        model=MODEL,
         system_prompt=(
             "You are a cooking assistant that provides practical, safe, and concise cooking advice. "
             "You have access to a temperature conversion tool and a recipe search MCP tool. "
