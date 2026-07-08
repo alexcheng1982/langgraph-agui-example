@@ -16,7 +16,7 @@ from langgraph.graph.state import CompiledStateGraph
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-load_dotenv();
+load_dotenv()
 
 DEFAULT_FOOD_RECIPE_MCP_URL = "https://recipes.aidatanorge.no/mcp"
 MODEL = os.getenv("MODEL", "openrouter:deepseek/deepseek-v4-flash")

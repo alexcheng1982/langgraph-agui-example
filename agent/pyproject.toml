@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Fu Cheng", email = "alexcheng1982@gmail.com" }
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
     "ag-ui-langgraph>=0.0.41",
     "fastapi>=0.136.3",
