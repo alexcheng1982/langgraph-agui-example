@@ -1,7 +1,7 @@
 "use client";
 
 import { useAgent } from "@copilotkit/react-core/v2";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type AgentState = {
   ingredients?: string[];
@@ -10,13 +10,14 @@ type AgentState = {
 export function IngredientsPanel() {
   const { agent } = useAgent();
   const [ingredients, setIngredients] = useState<string[]>([]);
+  const [newItem, setNewItem] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const syncState = (state: AgentState) => {
       setIngredients(state.ingredients ?? []);
     };
 
-    // Read current state immediately
     syncState(agent.state as AgentState);
 
     const subscriber = agent.subscribe({
@@ -25,6 +26,27 @@ export function IngredientsPanel() {
     });
     return () => subscriber.unsubscribe();
   }, [agent]);
+
+  const updateIngredients = (next: string[]) => {
+    setIngredients(next);
+    agent.setState({ ...(agent.state as object), ingredients: next });
+  };
+
+  const removeIngredient = (index: number) => {
+    updateIngredients(ingredients.filter((_, i) => i !== index));
+  };
+
+  const addIngredient = () => {
+    const trimmed = newItem.trim();
+    if (!trimmed) return;
+    updateIngredients([...ingredients, trimmed]);
+    setNewItem("");
+    inputRef.current?.focus();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") addIngredient();
+  };
 
   const isEmpty = ingredients.length === 0;
 
@@ -72,10 +94,32 @@ export function IngredientsPanel() {
               <li key={i} className="ingredient-chip">
                 <span className="chip-dot" aria-hidden="true" />
                 <span className="chip-label">{item}</span>
+                <button
+                  className="chip-remove"
+                  onClick={() => removeIngredient(i)}
+                  aria-label={`Remove ${item}`}
+                >
+                  ×
+                </button>
               </li>
             ))}
           </ul>
         )}
+      </div>
+
+      <div className="panel-add">
+        <input
+          ref={inputRef}
+          className="add-input"
+          type="text"
+          placeholder="Add ingredient…"
+          value={newItem}
+          onChange={(e) => setNewItem(e.target.value)}
+          onKeyDown={handleKeyDown}
+        />
+        <button className="add-btn" onClick={addIngredient} aria-label="Add">
+          +
+        </button>
       </div>
 
       <div className="panel-count">
@@ -153,6 +197,76 @@ export function IngredientsPanel() {
         .ingredient-chip:hover {
           background: var(--chip-bg-hover);
           border-color: var(--chip-border-hover);
+        }
+
+        .chip-remove {
+          margin-left: auto;
+          background: none;
+          border: none;
+          cursor: pointer;
+          color: var(--text-muted);
+          font-size: 1rem;
+          line-height: 1;
+          padding: 0 0.125rem;
+          opacity: 0;
+          transition: opacity 0.15s, color 0.15s;
+          flex-shrink: 0;
+        }
+
+        .ingredient-chip:hover .chip-remove {
+          opacity: 1;
+        }
+
+        .chip-remove:hover {
+          color: #c0392b;
+        }
+
+        .panel-add {
+          flex-shrink: 0;
+          padding: 0.5rem 1.25rem;
+          border-top: 1px solid var(--panel-border);
+          display: flex;
+          gap: 0.5rem;
+        }
+
+        .add-input {
+          flex: 1;
+          background: var(--chip-bg);
+          border: 1px solid var(--chip-border);
+          border-radius: 0.375rem;
+          padding: 0.375rem 0.625rem;
+          font-size: 0.875rem;
+          color: var(--text-primary);
+          outline: none;
+          transition: border-color 0.15s;
+        }
+
+        .add-input::placeholder {
+          color: var(--text-muted);
+        }
+
+        .add-input:focus {
+          border-color: var(--herb);
+        }
+
+        .add-btn {
+          background: var(--herb);
+          color: #fff;
+          border: none;
+          border-radius: 0.375rem;
+          width: 2rem;
+          font-size: 1.25rem;
+          line-height: 1;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: opacity 0.15s;
+          flex-shrink: 0;
+        }
+
+        .add-btn:hover {
+          opacity: 0.85;
         }
 
         .chip-dot {

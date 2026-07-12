@@ -7,10 +7,11 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from ag_ui_langgraph import LangGraphAgent, add_langgraph_fastapi_endpoint
 from langchain.agents import create_agent
+from langchain.agents.middleware import AgentMiddleware
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_core.tools import tool, InjectedToolCallId
-from langchain_core.messages import ToolMessage
-from typing import Annotated
+from langchain_core.messages import SystemMessage, ToolMessage
+from typing import Annotated, Any, Callable
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import MessagesState
 from langgraph.graph.state import CompiledStateGraph
@@ -97,18 +98,35 @@ def update_ingredients(
 def build_graph() -> CompiledStateGraph:
     mcp_tools = load_food_recipe_mcp_tools()
 
+    BASE_PROMPT = (
+        "You are a cooking assistant that provides practical, safe, and concise cooking advice. "
+        "You have access to a temperature conversion tool, a recipe search MCP tool, and an ingredients update tool. "
+        "Use the temperature tool whenever the user asks to convert temperatures between Celsius and Fahrenheit. "
+        "Use recipe search for recipe discovery or filtering requests. "
+        "Use the update_ingredients tool whenever the user mentions or lists ingredients they have, want to use, or want to track — extract and save the ingredient list using that tool. "
+        "IMPORTANT: The recipe search tool requires all query parameters to be in English. "
+        "If the user's request is in another language, translate key terms (dishes, ingredients, cooking methods) "
+        "to English before calling the recipe search tool."
+    )
+
+    def _inject_ingredients(request):
+        ingredients = (request.state or {}).get("ingredients") or []
+        if not ingredients:
+            return request
+        content = BASE_PROMPT + f"\n\nThe user currently has these ingredients: {', '.join(ingredients)}."
+        return request.override(system_message=SystemMessage(content=content))
+
+    class IngredientsMiddleware(AgentMiddleware):
+        def wrap_model_call(self, request, handler):
+            return handler(_inject_ingredients(request))
+
+        async def awrap_model_call(self, request, handler):
+            return await handler(_inject_ingredients(request))
+
     return create_agent(
         model=MODEL,
-        system_prompt=(
-            "You are a cooking assistant that provides practical, safe, and concise cooking advice. "
-            "You have access to a temperature conversion tool, a recipe search MCP tool, and an ingredients update tool. "
-            "Use the temperature tool whenever the user asks to convert temperatures between Celsius and Fahrenheit. "
-            "Use recipe search for recipe discovery or filtering requests. "
-            "Use the update_ingredients tool whenever the user mentions or lists ingredients they have, want to use, or want to track — extract and save the ingredient list using that tool. "
-            "IMPORTANT: The recipe search tool requires all query parameters to be in English. "
-            "If the user's request is in another language, translate key terms (dishes, ingredients, cooking methods) "
-            "to English before calling the recipe search tool."
-        ),
+        system_prompt=BASE_PROMPT,
+        middleware=[IngredientsMiddleware()],
         tools=[convert_temperature, update_ingredients, *mcp_tools],
         state_schema=AgentState,
         checkpointer=InMemorySaver(),
