@@ -9,12 +9,13 @@ from ag_ui_langgraph import LangGraphAgent, add_langgraph_fastapi_endpoint
 from langchain.agents import create_agent
 from langchain.agents.middleware import AgentMiddleware
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from langchain_core.tools import tool, InjectedToolCallId
+from langchain_core.tools import InjectedToolCallId, tool
 from langchain_core.messages import SystemMessage, ToolMessage
 from typing import Annotated, Any, Callable
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import MessagesState
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 
 
@@ -29,7 +30,9 @@ MODEL = os.getenv("MODEL", "openai:gpt-4.1-mini")
 logger.info("Use model %s", MODEL)
 
 class AgentState(MessagesState):
-    ingredients: list[str]
+    available_ingredients: list[str]
+    selected_ingredients: list[str]
+
 
 @tool
 def convert_temperature(value: float, from_scale: str, to_scale: str) -> str:
@@ -77,21 +80,48 @@ def convert_temperature(value: float, from_scale: str, to_scale: str) -> str:
 
 
 @tool
+def get_available_ingredients(
+    tool_call_id: Annotated[str, InjectedToolCallId],
+    state: Annotated[dict, InjectedState],
+) -> Command:
+    """Return available ingredients and initialize the selected list if needed."""
+    available_ingredients = [
+        "chicken breast",
+        "eggs",
+        "tomatoes",
+        "onions",
+        "garlic",
+        "potatoes",
+        "carrots",
+    ]
+    update = {"available_ingredients": available_ingredients}
+    if "selected_ingredients" not in state:
+        update["selected_ingredients"] = available_ingredients
+    return Command(update={
+        **update,
+        "messages": [ToolMessage(
+            "Available ingredients state updated.",
+            tool_call_id=tool_call_id,
+        )],
+    })
+
+
+@tool
 def update_ingredients(
-    ingredients: list[str],
+    selected_ingredients: list[str],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command:
-    """Update the ingredients list in the agent state.
+    """Update the selected ingredients list in the agent state.
 
     Args:
-        ingredients: The list of ingredients to set.
+        selected_ingredients: The list of ingredients selected for cooking.
 
     Returns:
         A Command that updates the agent state with the provided ingredients.
     """
     return Command(update={
-        "ingredients": ingredients,
-        "messages": [ToolMessage(f"Updated ingredients: {ingredients}", tool_call_id=tool_call_id)],
+        "selected_ingredients": selected_ingredients,
+        "messages": [ToolMessage("Selected ingredients state updated.", tool_call_id=tool_call_id)],
     })
 
 
@@ -100,20 +130,25 @@ def build_graph() -> CompiledStateGraph:
 
     BASE_PROMPT = (
         "You are a cooking assistant that provides practical, safe, and concise cooking advice. "
-        "You have access to a temperature conversion tool, a recipe search MCP tool, and an ingredients update tool. "
+        "You have access to a temperature conversion tool, an available ingredients tool, a recipe search MCP tool, and an ingredients update tool. "
         "Use the temperature tool whenever the user asks to convert temperatures between Celsius and Fahrenheit. "
+        "Use the available ingredients tool whenever the user asks what ingredients are currently available. "
         "Use recipe search for recipe discovery or filtering requests. "
-        "Use the update_ingredients tool whenever the user mentions or lists ingredients they have, want to use, or want to track — extract and save the ingredient list using that tool. "
+        "Use the update_ingredients tool whenever the user mentions or lists ingredients they have, want to use, or want to track — extract and save the selected ingredient list using that tool. "
         "IMPORTANT: The recipe search tool requires all query parameters to be in English. "
         "If the user's request is in another language, translate key terms (dishes, ingredients, cooking methods) "
         "to English before calling the recipe search tool."
     )
 
     def _inject_ingredients(request):
-        ingredients = (request.state or {}).get("ingredients") or []
-        if not ingredients:
-            return request
-        content = BASE_PROMPT + f"\n\nThe user currently has these ingredients: {', '.join(ingredients)}."
+        ingredients = (request.state or {}).get("selected_ingredients") or []
+        current_ingredients = ", ".join(ingredients) if ingredients else "none"
+        content = (
+            BASE_PROMPT
+            + f"\n\nThe user currently has these selected ingredients: {current_ingredients}."
+            + "\nThis selected ingredients list is authoritative. Ignore any ingredient lists "
+            + "from earlier messages or tool results."
+        )
         return request.override(system_message=SystemMessage(content=content))
 
     class IngredientsMiddleware(AgentMiddleware):
@@ -127,7 +162,7 @@ def build_graph() -> CompiledStateGraph:
         model=MODEL,
         system_prompt=BASE_PROMPT,
         middleware=[IngredientsMiddleware()],
-        tools=[convert_temperature, update_ingredients, *mcp_tools],
+        tools=[convert_temperature, get_available_ingredients, update_ingredients, *mcp_tools],
         state_schema=AgentState,
         checkpointer=InMemorySaver(),
     )
@@ -161,10 +196,12 @@ def load_food_recipe_mcp_tools():
 
 app = FastAPI(title="LangGraph AG-UI Agent")
 
+graph = build_graph()
+
 agui_agent = LangGraphAgent(
     name="cooking-agent",
     description="A simple LangGraph agent exposed over the AG-UI protocol.",
-    graph=build_graph(),
+    graph=graph,
 )
 
 add_langgraph_fastapi_endpoint(app, agui_agent, "/agent")

@@ -4,18 +4,21 @@ import { useAgent } from "@copilotkit/react-core/v2";
 import { useEffect, useRef, useState } from "react";
 
 type AgentState = {
-  ingredients?: string[];
+  available_ingredients?: string[];
+  selected_ingredients?: string[];
 };
 
 export function IngredientsPanel() {
   const { agent } = useAgent();
   const [ingredients, setIngredients] = useState<string[]>([]);
+  const [availableIngredients, setAvailableIngredients] = useState<string[]>([]);
   const [newItem, setNewItem] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const syncState = (state: AgentState) => {
-      setIngredients(state.ingredients ?? []);
+      setAvailableIngredients(state.available_ingredients ?? []);
+      setIngredients(state.selected_ingredients ?? []);
     };
 
     syncState(agent.state as AgentState);
@@ -29,7 +32,7 @@ export function IngredientsPanel() {
 
   const updateIngredients = (next: string[]) => {
     setIngredients(next);
-    agent.setState({ ...(agent.state as object), ingredients: next });
+    agent.setState({ ...(agent.state as object), selected_ingredients: next });
   };
 
   const removeIngredient = (index: number) => {
@@ -92,7 +95,12 @@ export function IngredientsPanel() {
           <ul className="ingredient-list" role="list">
             {ingredients.map((item, i) => (
               <li key={i} className="ingredient-chip">
-                <span className="chip-dot" aria-hidden="true" />
+                <span
+                  className={`chip-dot ${availableIngredients.some(
+                    (available) => available.trim().toLowerCase() === item.trim().toLowerCase(),
+                  ) ? "chip-dot-available" : "chip-dot-unavailable"}`}
+                  aria-hidden="true"
+                />
                 <span className="chip-label">{item}</span>
                 <button
                   className="chip-remove"
@@ -273,8 +281,15 @@ export function IngredientsPanel() {
           width: 6px;
           height: 6px;
           border-radius: 50%;
-          background: var(--herb);
           flex-shrink: 0;
+        }
+
+        .chip-dot-available {
+          background: #2eaf62;
+        }
+
+        .chip-dot-unavailable {
+          background: #d34b4b;
         }
 
         .chip-label {
