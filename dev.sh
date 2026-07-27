@@ -12,7 +12,7 @@ cd "$(dirname "$0")"
 (cd agent && uv run cooking_agent) &
 backend_pid=$!
 
-(cd web && npm run dev) &
+(cd web && pnpm run dev) &
 frontend_pid=$!
 
 wait
