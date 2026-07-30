@@ -5,13 +5,14 @@ import os
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
+import mlflow
 from ag_ui_langgraph import LangGraphAgent, add_langgraph_fastapi_endpoint
 from langchain.agents import create_agent
 from langchain.agents.middleware import AgentMiddleware
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_core.tools import InjectedToolCallId, tool
 from langchain_core.messages import SystemMessage, ToolMessage
-from typing import Annotated, Any, Callable
+from typing import Annotated
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import MessagesState
 from langgraph.graph.state import CompiledStateGraph
@@ -25,9 +26,32 @@ logging.basicConfig(level=logging.INFO)
 load_dotenv()
 
 DEFAULT_FOOD_RECIPE_MCP_URL = "https://recipes.aidatanorge.no/mcp"
+DEFAULT_MLFLOW_TRACKING_URI = "http://localhost:5000"
+DEFAULT_MLFLOW_EXPERIMENT = "cooking-agent"
 MODEL = os.getenv("MODEL", "openai:gpt-4.1-mini")
 
 logger.info("Use model %s", MODEL)
+
+
+def configure_mlflow() -> None:
+    """Configure MLflow tracing before constructing the LangGraph agent."""
+    tracking_uri = os.getenv("MLFLOW_TRACKING_URI", DEFAULT_MLFLOW_TRACKING_URI)
+    experiment_name = os.getenv("MLFLOW_EXPERIMENT_NAME", DEFAULT_MLFLOW_EXPERIMENT)
+
+    mlflow.set_tracking_uri(tracking_uri)
+    try:
+        mlflow.set_experiment(experiment_name)
+    except Exception as exc:  # pragma: no cover - depends on MLflow availability
+        logger.warning("Unable to set MLflow experiment %s: %s", experiment_name, exc)
+
+    # This enables automatic tracing for LangChain and LangGraph invocations.
+    mlflow.langchain.autolog(silent=True)
+    # This also captures OpenAI SDK calls made directly or underneath integrations.
+    mlflow.openai.autolog(silent=True)
+    logger.info("MLflow tracing enabled: %s (experiment=%s)", tracking_uri, experiment_name)
+
+
+configure_mlflow()
 
 class AgentState(MessagesState):
     available_ingredients: list[str]
