@@ -13,6 +13,21 @@ A full-stack demo that connects a LangChain/LangGraph cooking assistant to a Cop
 - The frontend hosts a CopilotKit runtime route at `/api/copilotkit`.
 - That runtime route forwards chat requests to the backend agent URL.
 
+## Human-in-the-loop shopping demo
+
+Try a request such as: “Please buy 2 eggs, tomatoes, and garlic for me.” The
+simulated shopping workflow demonstrates the complete pause → human decision →
+resume pattern:
+
+1. The agent calls the frontend `purchase_online` tool exposed through
+   `CopilotKitMiddleware`.
+2. CopilotKit renders an approval card in the chat and pauses the tool call.
+3. **Confirm purchase** returns `{ "approved": true }` to the agent, after which
+   the simulated order step runs.
+4. **Cancel** returns a rejection and no order is placed.
+
+No real store, payment provider, or external side effect is involved.
+
 ## Prerequisites
 
 - Python 3.14+

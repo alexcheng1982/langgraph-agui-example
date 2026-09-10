@@ -11,7 +11,11 @@ export function CopilotProvider({ children }: CopilotProviderProps) {
   const enableInspector = process.env.NODE_ENV === "development";
 
   return (
-    <CopilotKit runtimeUrl="/api/copilotkit" enableInspector={enableInspector}>
+    <CopilotKit
+      runtimeUrl="/api/copilotkit"
+      useSingleEndpoint={false}
+      enableInspector={enableInspector}
+    >
       {children}
     </CopilotKit>
   );

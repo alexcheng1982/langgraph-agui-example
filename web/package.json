@@ -9,13 +9,14 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@copilotkit/react-core": "1.63.2",
-    "@copilotkit/react-ui": "1.63.2",
-    "@copilotkit/runtime": "1.63.2",
+    "@copilotkit/react-core": "1.71.0",
+    "@copilotkit/react-ui": "1.71.0",
+    "@copilotkit/runtime": "1.71.0",
     "next": "16.2.12",
-    "openai": "^6.49.0",
-    "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "openai": "^7.13.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

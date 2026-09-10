@@ -1,6 +1,8 @@
 import asyncio
+import json
 import logging
 import os
+import random
 
 import uvicorn
 from dotenv import load_dotenv
@@ -18,6 +20,7 @@ from langgraph.graph import MessagesState
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
+from copilotkit import CopilotKitMiddleware
 
 
 logger = logging.getLogger(__name__)
@@ -104,6 +107,26 @@ def convert_temperature(value: float, from_scale: str, to_scale: str) -> str:
 
 
 @tool
+def get_item_prices(items: list[str], currency: str = "USD") -> str:
+    """Assign random simulated unit prices to shopping items and calculate a total."""
+    if not items:
+        return json.dumps({"items": [], "total": 0, "currency": currency})
+
+    priced_items = []
+    total = 0.0
+    for item in items:
+        unit_price = round(random.uniform(1.50, 12.00), 2)
+        total += unit_price
+        priced_items.append({"item": item, "unit_price": unit_price, "currency": currency})
+
+    return json.dumps({
+        "items": priced_items,
+        "total": round(total, 2),
+        "currency": currency,
+    })
+
+
+@tool
 def get_available_ingredients(
     tool_call_id: Annotated[str, InjectedToolCallId],
     state: Annotated[dict, InjectedState],
@@ -154,7 +177,7 @@ def build_graph() -> CompiledStateGraph:
 
     BASE_PROMPT = (
         "You are a cooking assistant that provides practical, safe, and concise cooking advice. "
-        "You have access to a temperature conversion tool, an available ingredients tool, a recipe search MCP tool, and an ingredients update tool. "
+        "You have access to a temperature conversion tool, an available ingredients tool, a recipe search MCP tool, an ingredients update tool, a simulated item pricing tool, and a simulated online shopping tool. "
         "Use the temperature tool whenever the user asks to convert temperatures between Celsius and Fahrenheit. "
         "Use the available ingredients tool whenever the user asks what ingredients are currently available. "
         "Use recipe search for recipe discovery or filtering requests. "
@@ -162,6 +185,10 @@ def build_graph() -> CompiledStateGraph:
         "IMPORTANT: Do NOT restate, enumerate, or echo the currently selected ingredients back to the user in your text responses. "
         "The selected ingredients are already displayed to the user in the UI, so repeating them is redundant. "
         "After updating the selected ingredients, simply confirm the change briefly without listing them out. "
+        "When the user asks to buy, order, or shop for items, you MUST call the frontend purchase_online tool; do not answer with only a text confirmation. "
+        "For online shopping requests, first use purchase_online to prepare the requested item list and total. "
+        "Before calling purchase_online, call get_item_prices with the requested items and use its returned random unit prices and total. "
+        "That tool always pauses for explicit human approval before simulating the purchase; never claim an order was placed before approval. "
         "IMPORTANT: The recipe search tool requires all query parameters to be in English. "
         "If the user's request is in another language, translate key terms (dishes, ingredients, cooking methods) "
         "to English before calling the recipe search tool."
@@ -188,8 +215,8 @@ def build_graph() -> CompiledStateGraph:
     return create_agent(
         model=MODEL,
         system_prompt=BASE_PROMPT,
-        middleware=[IngredientsMiddleware()],
-        tools=[convert_temperature, get_available_ingredients, update_ingredients, *mcp_tools],
+        middleware=[IngredientsMiddleware(), CopilotKitMiddleware()],
+        tools=[convert_temperature, get_available_ingredients, update_ingredients, get_item_prices, *mcp_tools],
         state_schema=AgentState,
         checkpointer=InMemorySaver(),
     )
